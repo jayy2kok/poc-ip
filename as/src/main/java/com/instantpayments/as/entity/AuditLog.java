@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
@@ -43,7 +44,11 @@ public class AuditLog {
   @Column(name = "captured_at", nullable = false)
   private Instant capturedAt;
 
-  /** Sets the capture timestamp before the entity is persisted if not already set. */
+  /**
+   * Lifecycle callback invoked by JPA before the entity is persisted. If the timestamp wasn't
+   * supplied by the caller, stamp it with the current time.
+   */
+  @PrePersist
   public void prePersist() {
     if (capturedAt == null) {
       capturedAt = Instant.now();
