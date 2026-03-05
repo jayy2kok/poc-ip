@@ -1,0 +1,126 @@
+services:
+  # ==================== Infrastructure ====================
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: poc-ip-postgres
+    environment:
+      POSTGRES_DB: instantpayments
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres-data:/var/lib/postgresql/data
+    command: >
+      postgres
+        -c wal_level=logical
+        -c max_wal_senders=4
+        -c max_replication_slots=4
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  artemis:
+    image: apache/activemq-artemis:2.33.0-alpine
+    container_name: poc-ip-artemis
+    environment:
+      ARTEMIS_USER: admin
+      ARTEMIS_PASSWORD: admin
+    ports:
+      - "61616:61616" # CORE/OpenWire
+      - "8161:8161" # Web console
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 61616"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+
+  # ==================== Application Services ====================
+
+  pps:
+    build:
+      context: ./pps
+      dockerfile: Dockerfile
+    container_name: poc-ip-pps
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: sol1
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/instantpayments
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_ARTEMIS_BROKER_URL: tcp://artemis:61616
+      SPRING_ARTEMIS_USER: admin
+      SPRING_ARTEMIS_PASSWORD: admin
+    depends_on:
+      postgres:
+        condition: service_healthy
+      artemis:
+        condition: service_healthy
+
+  bs:
+    build:
+      context: ./bs
+      dockerfile: Dockerfile
+    container_name: poc-ip-bs
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: sol1
+      SPRING_ARTEMIS_BROKER_URL: tcp://artemis:61616
+      SPRING_ARTEMIS_USER: admin
+      SPRING_ARTEMIS_PASSWORD: admin
+    depends_on:
+      artemis:
+        condition: service_healthy
+
+  fcs:
+    build:
+      context: ./fcs
+      dockerfile: Dockerfile
+    container_name: poc-ip-fcs
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_ARTEMIS_BROKER_URL: tcp://artemis:61616
+      SPRING_ARTEMIS_USER: admin
+      SPRING_ARTEMIS_PASSWORD: admin
+    depends_on:
+      artemis:
+        condition: service_healthy
+
+  audit-service:
+    build:
+      context: ./as
+      dockerfile: Dockerfile
+    container_name: poc-ip-audit-service
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/instantpayments
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  debezium:
+    image: quay.io/debezium/server:2.5
+    container_name: poc-ip-debezium
+    volumes:
+      - ./docker/debezium/application.properties:/debezium/conf/application.properties
+      - debezium-data:/debezium/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      audit-service:
+        condition: service_started
+
+volumes:
+  postgres-data:
+  debezium-data:

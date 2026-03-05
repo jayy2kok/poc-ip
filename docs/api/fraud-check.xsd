@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tns="http://poc.instantpayments/fraud"
+           targetNamespace="http://poc.instantpayments/fraud"
+           elementFormDefault="qualified">
+
+    <!-- ==================== Fraud Check Request ==================== -->
+    <xs:element name="FraudCheckRequest" type="tns:FraudCheckRequestType"/>
+
+    <xs:complexType name="FraudCheckRequestType">
+        <xs:sequence>
+            <xs:element name="transactionId" type="xs:string"/>
+            <xs:element name="payer" type="tns:PartyType"/>
+            <xs:element name="payee" type="tns:PartyType"/>
+            <xs:element name="paymentInstruction" type="xs:string" minOccurs="0"/>
+            <xs:element name="executionDate" type="xs:date"/>
+            <xs:element name="amount" type="tns:AmountType"/>
+            <xs:element name="currency" type="tns:CurrencyType"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- ==================== Fraud Check Response ==================== -->
+    <xs:element name="FraudCheckResponse" type="tns:FraudCheckResponseType"/>
+
+    <xs:complexType name="FraudCheckResponseType">
+        <xs:sequence>
+            <xs:element name="transactionId" type="xs:string"/>
+            <xs:element name="outcome" type="tns:OutcomeType"/>
+            <xs:element name="message" type="xs:string"/>
+            <xs:element name="checkedAt" type="xs:dateTime"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- ==================== Shared Types ==================== -->
+    <xs:complexType name="PartyType">
+        <xs:sequence>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="bank" type="xs:string"/>
+            <xs:element name="countryCode" type="tns:CountryCodeType"/>
+            <xs:element name="account" type="xs:string"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:simpleType name="CountryCodeType">
+        <xs:restriction base="xs:string">
+            <xs:pattern value="[A-Z]{3}"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="CurrencyType">
+        <xs:restriction base="xs:string">
+            <xs:pattern value="[A-Z]{3}"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="AmountType">
+        <xs:restriction base="xs:decimal">
+            <xs:fractionDigits value="2"/>
+            <xs:minExclusive value="0"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="OutcomeType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="APPROVED"/>
+            <xs:enumeration value="REJECTED"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+</xs:schema>

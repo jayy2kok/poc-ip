@@ -1,0 +1,37 @@
+spring:
+    application:
+        name: fraud-check-system
+
+    artemis:
+        mode: native
+        broker-url: tcp://localhost:61616
+        user: admin
+        password: admin
+
+server:
+    port: 8083
+
+# Blacklist configuration
+blacklist:
+    names:
+        - "Mark Imaginary"
+        - "Govind Real"
+        - "Shakil Maybe"
+        - "Chang Imagine"
+    countries:
+        - "CUB"
+        - "IRQ"
+        - "IRN"
+        - "PRK"
+        - "SDN"
+        - "SYR"
+    banks:
+        - "BANK OF KUNLUN"
+        - "KARAMAY CITY COMMERCIAL BANK"
+    paymentInstructions:
+        - "Artillery Procurement"
+        - "Lethal Chemicals payment"
+
+logging:
+    level:
+        com.instantpayments.fcs: DEBUG

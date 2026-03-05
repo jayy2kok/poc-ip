@@ -1,0 +1,395 @@
+openapi: 3.0.3
+info:
+  title: Payment Processing System (PPS) API
+  description: |
+    REST API for the Payment Processing System.
+    Handles payment submission and status tracking.
+  version: 1.0.0
+  contact:
+    name: Instant Payments PoC
+
+servers:
+  - url: http://localhost:8081
+    description: Local development server
+
+tags:
+  - name: Payments
+    description: Payment submission and status tracking
+
+paths:
+  /api/v1/payments:
+    post:
+      tags: [Payments]
+      summary: Submit a new payment
+      description: |
+        Validates and submits a payment for processing. If validation passes,
+        the payment is persisted with status `PENDING` and forwarded for fraud checking.
+        Returns 202 Accepted with the transaction ID.
+      operationId: submitPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentRequest"
+            example:
+              payerName: "Munster Muller"
+              payerBank: "Bank of America"
+              payerCountryCode: "USA"
+              payerAccount: "1234567890"
+              payeeName: "John Doe"
+              payeeBank: "BNP Paribas"
+              payeeCountryCode: "DEU"
+              payeeAccount: "0987654321"
+              paymentInstruction: "Loan Repayment"
+              executionDate: "2026-03-04"
+              amount: 1500.00
+              currency: "EUR"
+      responses:
+        "202":
+          description: Payment accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+              example:
+                transactionId: "550e8400-e29b-41d4-a716-446655440000"
+                status: "PENDING"
+                message: "Payment accepted for processing"
+                creationTimestamp: "2026-03-04T12:30:00.000Z"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+              example:
+                status: 400
+                error: "Validation Failed"
+                message: "Payment request contains validation errors"
+                timestamp: "2026-03-04T12:30:00.000Z"
+                errors:
+                  - field: "payerCountryCode"
+                    message: "Invalid ISO 3166-1 alpha-3 country code"
+                  - field: "currency"
+                    message: "Invalid ISO 4217 currency code"
+
+    get:
+      tags: [Payments]
+      summary: List all payments
+      description: Returns a paginated list of all payments, optionally filtered by status.
+      operationId: listPayments
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/PaymentStatus"
+          description: Filter by payment status
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description: Page number (zero-based)
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "createdAt,desc"
+          description: Sort field and direction
+      responses:
+        "200":
+          description: Paginated list of payments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedPaymentResponse"
+
+  /api/v1/payments/{transactionId}:
+    get:
+      tags: [Payments]
+      summary: Get payment by transaction ID
+      description: Returns the full details of a payment identified by its unique transaction ID.
+      operationId: getPaymentByTransactionId
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique transaction identifier (UUID)
+      responses:
+        "200":
+          description: Payment details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentDetailResponse"
+        "404":
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/payments/{transactionId}/status:
+    get:
+      tags: [Payments]
+      summary: Get payment status
+      description: Returns the current status of a payment (PENDING, APPROVED, or REJECTED).
+      operationId: getPaymentStatus
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Payment status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentStatusResponse"
+              example:
+                transactionId: "550e8400-e29b-41d4-a716-446655440000"
+                status: "APPROVED"
+                updatedAt: "2026-03-04T12:30:05.000Z"
+        "404":
+          description: Payment not found
+
+components:
+  schemas:
+    PaymentRequest:
+      type: object
+      description: Payment submission request
+      required:
+        - payerName
+        - payerBank
+        - payerCountryCode
+        - payerAccount
+        - payeeName
+        - payeeBank
+        - payeeCountryCode
+        - payeeAccount
+        - executionDate
+        - amount
+        - currency
+      properties:
+        payerName:
+          type: string
+          description: Payer's first and last name
+          example: "Munster Muller"
+          minLength: 1
+          maxLength: 255
+        payerBank:
+          type: string
+          description: Name of the payer's bank
+          example: "Bank of America"
+          minLength: 1
+          maxLength: 255
+        payerCountryCode:
+          type: string
+          description: ISO 3166-1 alpha-3 country code
+          example: "USA"
+          pattern: "^[A-Z]{3}$"
+        payerAccount:
+          type: string
+          description: Payer's account number
+          example: "1234567890"
+          minLength: 1
+          maxLength: 50
+        payeeName:
+          type: string
+          description: Payee's first and last name
+          example: "John Doe"
+          minLength: 1
+          maxLength: 255
+        payeeBank:
+          type: string
+          description: Name of the payee's bank
+          example: "BNP Paribas"
+          minLength: 1
+          maxLength: 255
+        payeeCountryCode:
+          type: string
+          description: ISO 3166-1 alpha-3 country code
+          example: "DEU"
+          pattern: "^[A-Z]{3}$"
+        payeeAccount:
+          type: string
+          description: Payee's account number
+          example: "0987654321"
+          minLength: 1
+          maxLength: 50
+        paymentInstruction:
+          type: string
+          description: Free text payment instruction (optional)
+          example: "Loan Repayment"
+        executionDate:
+          type: string
+          format: date
+          description: Execution date in ISO 8601 format (YYYY-MM-DD)
+          example: "2026-03-04"
+        amount:
+          type: number
+          format: double
+          description: Payment amount with 2 decimal places
+          example: 1500.00
+          minimum: 0.01
+        currency:
+          type: string
+          description: ISO 4217 currency code
+          example: "EUR"
+          pattern: "^[A-Z]{3}$"
+
+    PaymentResponse:
+      type: object
+      description: Response after successful payment submission
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+          description: Unique transaction identifier
+        status:
+          $ref: "#/components/schemas/PaymentStatus"
+        message:
+          type: string
+          description: Human-readable status message
+        creationTimestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 UTC timestamp
+
+    PaymentDetailResponse:
+      type: object
+      description: Full payment details
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        payerName:
+          type: string
+        payerBank:
+          type: string
+        payerCountryCode:
+          type: string
+        payerAccount:
+          type: string
+        payeeName:
+          type: string
+        payeeBank:
+          type: string
+        payeeCountryCode:
+          type: string
+        payeeAccount:
+          type: string
+        paymentInstruction:
+          type: string
+        executionDate:
+          type: string
+          format: date
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        status:
+          $ref: "#/components/schemas/PaymentStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaymentStatusResponse:
+      type: object
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/PaymentStatus"
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaymentStatus:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED]
+      description: Current status of the payment
+
+    PagedPaymentResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentDetailResponse"
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: "Validation Failed"
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/FieldError"
+
+    FieldError:
+      type: object
+      properties:
+        field:
+          type: string
+          description: Name of the field that failed validation
+        message:
+          type: string
+          description: Validation error message
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

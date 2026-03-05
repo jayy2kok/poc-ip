@@ -1,0 +1,163 @@
+openapi: 3.0.3
+info:
+  title: Broker System (BS) API
+  description: |
+    REST API for the Broker System (Solution 2 only).
+    Accepts fraud check requests from PPS, converts JSON to XML,
+    forwards to FCS via JMS, and returns results via notification queue.
+  version: 1.0.0
+  contact:
+    name: Instant Payments PoC
+
+servers:
+  - url: http://localhost:8082
+    description: Local development server
+
+tags:
+  - name: Fraud Check
+    description: Fraud check request handling (Solution 2 inbound)
+
+paths:
+  /api/v1/fraud-check:
+    post:
+      tags: [Fraud Check]
+      summary: Submit a fraud check request
+      description: |
+        Accepts a payment payload in JSON from PPS (Solution 2).
+        Converts to XML and forwards to FCS via JMS for fraud screening.
+        Returns 202 Accepted immediately — result is delivered asynchronously
+        via the `payment.notification.queue`.
+      operationId: submitFraudCheck
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FraudCheckRequest"
+            example:
+              transactionId: "550e8400-e29b-41d4-a716-446655440000"
+              payerName: "Munster Muller"
+              payerBank: "Bank of America"
+              payerCountryCode: "USA"
+              payerAccount: "1234567890"
+              payeeName: "John Doe"
+              payeeBank: "BNP Paribas"
+              payeeCountryCode: "DEU"
+              payeeAccount: "0987654321"
+              paymentInstruction: "Loan Repayment"
+              executionDate: "2026-03-04"
+              amount: 1500.00
+              currency: "EUR"
+      responses:
+        "202":
+          description: Fraud check request accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FraudCheckAcceptedResponse"
+              example:
+                transactionId: "550e8400-e29b-41d4-a716-446655440000"
+                status: "PROCESSING"
+                message: "Fraud check request accepted. Result will be delivered via notification queue."
+        "400":
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    FraudCheckRequest:
+      type: object
+      description: Payment data for fraud check (JSON from PPS, will be converted to XML for FCS)
+      required:
+        - transactionId
+        - payerName
+        - payerBank
+        - payerCountryCode
+        - payerAccount
+        - payeeName
+        - payeeBank
+        - payeeCountryCode
+        - payeeAccount
+        - executionDate
+        - amount
+        - currency
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+          description: Unique transaction identifier
+        payerName:
+          type: string
+          description: Payer's first and last name
+        payerBank:
+          type: string
+          description: Name of the payer's bank
+        payerCountryCode:
+          type: string
+          description: ISO 3166-1 alpha-3 country code
+          pattern: "^[A-Z]{3}$"
+        payerAccount:
+          type: string
+          description: Payer's account number
+        payeeName:
+          type: string
+          description: Payee's first and last name
+        payeeBank:
+          type: string
+          description: Name of the payee's bank
+        payeeCountryCode:
+          type: string
+          description: ISO 3166-1 alpha-3 country code
+          pattern: "^[A-Z]{3}$"
+        payeeAccount:
+          type: string
+          description: Payee's account number
+        paymentInstruction:
+          type: string
+          description: Free text payment instruction (optional)
+        executionDate:
+          type: string
+          format: date
+          description: Execution date (YYYY-MM-DD)
+        amount:
+          type: number
+          format: double
+          description: Payment amount (2 decimal places)
+        currency:
+          type: string
+          description: ISO 4217 currency code
+          pattern: "^[A-Z]{3}$"
+
+    FraudCheckAcceptedResponse:
+      type: object
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PROCESSING]
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

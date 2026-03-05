@@ -1,0 +1,434 @@
+openapi: 3.0.3
+info:
+  title: Audit Service (AS) API
+  description: |
+    REST API for the Audit Service.
+    Receives CDC change events from Debezium Server and provides
+    audit log retrieval with before/after state comparison.
+  version: 1.0.0
+  contact:
+    name: Instant Payments PoC
+
+servers:
+  - url: http://localhost:8084
+    description: Local development server
+
+tags:
+  - name: CDC Ingest
+    description: Debezium Server CDC event ingestion
+  - name: Audit Logs
+    description: Audit log querying and retrieval
+
+paths:
+  /api/v1/cdc/payments:
+    post:
+      tags: [CDC Ingest]
+      summary: Ingest a CDC change event
+      description: |
+        Receives a Debezium CDC change event for the `payments` table.
+        This endpoint is called by Debezium Server's HTTP sink connector
+        whenever a row is inserted, updated, or deleted in the `payments` table.
+        Not intended for direct user/UI consumption.
+      operationId: ingestCdcEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CdcChangeEvent"
+            examples:
+              insert:
+                summary: INSERT — Payment created
+                value:
+                  op: "c"
+                  ts_ms: 1709554200000
+                  source:
+                    table: "payments"
+                    db: "instantpayments"
+                    lsn: 33495432
+                  before: null
+                  after:
+                    transaction_id: "550e8400-e29b-41d4-a716-446655440000"
+                    payer_name: "Munster Muller"
+                    payer_bank: "Bank of America"
+                    payer_country: "USA"
+                    payer_account: "1234567890"
+                    payee_name: "John Doe"
+                    payee_bank: "BNP Paribas"
+                    payee_country: "DEU"
+                    payee_account: "0987654321"
+                    payment_instruction: "Loan Repayment"
+                    execution_date: "2026-03-04"
+                    amount: 1500.00
+                    currency: "EUR"
+                    status: "PENDING"
+                    fraud_message: null
+                    created_at: "2026-03-04T12:30:00.000Z"
+                    updated_at: "2026-03-04T12:30:00.000Z"
+              update:
+                summary: UPDATE — Status changed after fraud check
+                value:
+                  op: "u"
+                  ts_ms: 1709554205000
+                  source:
+                    table: "payments"
+                    db: "instantpayments"
+                    lsn: 33495500
+                  before:
+                    transaction_id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "PENDING"
+                    fraud_message: null
+                    updated_at: "2026-03-04T12:30:00.000Z"
+                  after:
+                    transaction_id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "APPROVED"
+                    fraud_message: "Nothing found, all okay"
+                    updated_at: "2026-03-04T12:30:05.000Z"
+      responses:
+        "200":
+          description: CDC event processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CdcAckResponse"
+              example:
+                status: "ACCEPTED"
+                auditLogId: 42
+        "400":
+          description: Invalid or malformed CDC event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/audit-logs:
+    get:
+      tags: [Audit Logs]
+      summary: List audit log entries
+      description: |
+        Returns a paginated, filterable list of audit log entries.
+        Each entry represents a CDC change event captured from the `payments` table.
+      operationId: listAuditLogs
+      parameters:
+        - name: transactionId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Filter by transaction ID
+        - name: operation
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [INSERT, UPDATE, DELETE]
+          description: Filter by operation type
+        - name: fromDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Filter from source timestamp (inclusive)
+        - name: toDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Filter to source timestamp (inclusive)
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description: Page number (zero-based)
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "sourceTs,desc"
+          description: Sort field and direction
+      responses:
+        "200":
+          description: Paginated list of audit log entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedAuditLogResponse"
+
+  /api/v1/audit-logs/{transactionId}:
+    get:
+      tags: [Audit Logs]
+      summary: Get change history for a transaction
+      description: |
+        Returns the complete change history (audit trail) for a specific
+        transaction, ordered chronologically. Each entry shows the operation
+        type and before/after state of the payment row.
+      operationId: getChangeHistory
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Transaction ID to get change history for
+      responses:
+        "200":
+          description: Change history for the transaction
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditLogEntry"
+              example:
+                - id: 1
+                  transactionId: "550e8400-e29b-41d4-a716-446655440000"
+                  operation: "INSERT"
+                  beforeState: null
+                  afterState:
+                    transaction_id: "550e8400-e29b-41d4-a716-446655440000"
+                    payer_name: "Munster Muller"
+                    status: "PENDING"
+                    amount: 1500.00
+                    currency: "EUR"
+                  changedFields: null
+                  sourceTs: "2026-03-04T12:30:00.000Z"
+                  capturedAt: "2026-03-04T12:30:00.150Z"
+                - id: 2
+                  transactionId: "550e8400-e29b-41d4-a716-446655440000"
+                  operation: "UPDATE"
+                  beforeState:
+                    status: "PENDING"
+                    fraud_message: null
+                    updated_at: "2026-03-04T12:30:00.000Z"
+                  afterState:
+                    status: "APPROVED"
+                    fraud_message: "Nothing found, all okay"
+                    updated_at: "2026-03-04T12:30:05.000Z"
+                  changedFields: ["status", "fraud_message", "updated_at"]
+                  sourceTs: "2026-03-04T12:30:05.000Z"
+                  capturedAt: "2026-03-04T12:30:05.120Z"
+        "404":
+          description: No audit entries found for this transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/audit-logs/{transactionId}/diff:
+    get:
+      tags: [Audit Logs]
+      summary: Get before/after diff for a transaction
+      description: |
+        Returns a simplified diff view showing only the fields that changed
+        across each state transition. Useful for the UI's side-by-side
+        comparison view.
+      operationId: getTransactionDiff
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Diff entries for the transaction
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DiffEntry"
+              example:
+                - sourceTs: "2026-03-04T12:30:05.000Z"
+                  operation: "UPDATE"
+                  changes:
+                    - field: "status"
+                      oldValue: "PENDING"
+                      newValue: "APPROVED"
+                    - field: "fraud_message"
+                      oldValue: null
+                      newValue: "Nothing found, all okay"
+                    - field: "updated_at"
+                      oldValue: "2026-03-04T12:30:00.000Z"
+                      newValue: "2026-03-04T12:30:05.000Z"
+
+components:
+  schemas:
+    CdcChangeEvent:
+      type: object
+      description: Debezium CDC change event envelope
+      required:
+        - op
+        - ts_ms
+        - source
+      properties:
+        op:
+          type: string
+          description: |
+            Operation type: `c` = INSERT (create), `u` = UPDATE,
+            `d` = DELETE, `r` = READ (snapshot)
+          enum: ["c", "u", "d", "r"]
+        ts_ms:
+          type: integer
+          format: int64
+          description: Timestamp of the change event in milliseconds since epoch
+        source:
+          $ref: "#/components/schemas/CdcSource"
+        before:
+          type: object
+          nullable: true
+          description: Row state before the change (null for INSERT)
+          additionalProperties: true
+        after:
+          type: object
+          nullable: true
+          description: Row state after the change (null for DELETE)
+          additionalProperties: true
+
+    CdcSource:
+      type: object
+      description: Debezium source metadata
+      properties:
+        table:
+          type: string
+          description: Source table name
+          example: "payments"
+        db:
+          type: string
+          description: Source database name
+          example: "instantpayments"
+        lsn:
+          type: integer
+          format: int64
+          description: PostgreSQL Log Sequence Number
+
+    CdcAckResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ACCEPTED, REJECTED]
+          description: Whether the CDC event was processed successfully
+        auditLogId:
+          type: integer
+          format: int64
+          description: ID of the created audit_logs record
+
+    AuditLogEntry:
+      type: object
+      description: A single CDC audit log record
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Auto-generated audit log entry ID
+        transactionId:
+          type: string
+          format: uuid
+          description: Payment transaction ID
+        operation:
+          type: string
+          enum: [INSERT, UPDATE, DELETE]
+          description: Type of database operation
+        beforeState:
+          type: object
+          nullable: true
+          description: JSONB snapshot of the row before the change (null for INSERT)
+          additionalProperties: true
+        afterState:
+          type: object
+          nullable: true
+          description: JSONB snapshot of the row after the change (null for DELETE)
+          additionalProperties: true
+        changedFields:
+          type: array
+          nullable: true
+          items:
+            type: string
+          description: List of column names that changed (UPDATE only)
+          example: ["status", "fraud_message", "updated_at"]
+        sourceTs:
+          type: string
+          format: date-time
+          description: Timestamp of the original DB commit (from Debezium)
+        capturedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the audit log entry was persisted
+
+    PagedAuditLogResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLogEntry"
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+
+    DiffEntry:
+      type: object
+      description: Simplified diff showing field-level changes for one state transition
+      properties:
+        sourceTs:
+          type: string
+          format: date-time
+        operation:
+          type: string
+          enum: [INSERT, UPDATE, DELETE]
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/FieldChange"
+
+    FieldChange:
+      type: object
+      description: A single field-level change
+      properties:
+        field:
+          type: string
+          description: Column name that changed
+        oldValue:
+          description: Previous value (null for INSERT)
+          nullable: true
+        newValue:
+          description: New value (null for DELETE)
+          nullable: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
