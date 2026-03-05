@@ -38,16 +38,25 @@ graph TB
     User["User / Swagger UI"]
 
     subgraph "Instant Payments Platform"
-        PPS["Payment Processing\nSystem (PPS)\n:8081"]
-        BS["Broker System (BS)\n:8082"]
-        FCS["Fraud Check\nSystem (FCS)\n:8083"]
-        AS["Audit Service (AS)\n:8084"]
+        PPS["Payment Processing
+        System (PPS)
+        :8081"]
+        BS["Broker System (BS)
+        :8082"]
+        FCS["Fraud Check
+        System (FCS)
+        :8083"]
+        AS["Audit Service (AS)
+        :8084"]
     end
 
     subgraph "Infrastructure"
-        AMQ["ActiveMQ Artemis\n:61616"]
-        PG["PostgreSQL\n:5432"]
-        DBZ["Debezium Server\n:8085"]
+        AMQ["ActiveMQ Artemis
+        :61616"]
+        PG["PostgreSQL
+        :5432"]
+        DBZ["Debezium Server
+        :8085"]
     end
 
     User -->|"REST API / WebSocket"| PPS
@@ -84,8 +93,10 @@ graph TB
         direction TB
 
         subgraph "API Layer"
-            PC["PaymentController\n(REST)"]
-            WS["WebSocket\nEndpoint"]
+            PC["PaymentController
+            (REST)"]
+            WS["WebSocket
+            Endpoint"]
         end
 
         subgraph "Service Layer"
@@ -98,9 +109,12 @@ graph TB
         end
 
         subgraph "Integration Layer"
-            CR_SOL1["Camel JMS Routes\n(Sol1 Profile)"]
-            CR_SOL2["REST Client\n(Sol2 Profile)"]
-            NL["Notification Listener\n(JMS)"]
+            CR_SOL1["Camel JMS Routes
+            (Sol1 Profile)"]
+            CR_SOL2["REST Client
+            (Sol2 Profile)"]
+            NL["Notification Listener
+            (JMS)"]
         end
     end
 
@@ -129,20 +143,28 @@ graph TB
         direction TB
 
         subgraph "Inbound"
-            JMS_IN["JMS Listener\n(Sol1 - payment.request.queue)"]
-            REST_IN["REST Controller\n(Sol2 - /api/v1/fraud-check)"]
+            JMS_IN["JMS Listener
+            (Sol1 - payment.request.queue)"]
+            REST_IN["REST Controller
+            (Sol2 - /api/v1/fraud-check)"]
         end
 
         subgraph "Processing"
-            J2X["JSON → XML\nConverter"]
-            X2J["XML → JSON\nConverter"]
-            ROUTE["Camel Routes\n(Orchestration)"]
+            J2X["JSON → XML
+            Converter"]
+            X2J["XML → JSON
+            Converter"]
+            ROUTE["Camel Routes
+            (Orchestration)"]
         end
 
         subgraph "Outbound"
-            FCS_OUT["JMS Producer\n(fraud.request.queue)"]
-            FCS_IN["JMS Listener\n(fraud.response.queue)"]
-            PPS_OUT["JMS Producer\n(payment.notification.queue)"]
+            FCS_OUT["JMS Producer
+            (fraud.request.queue)"]
+            FCS_IN["JMS Listener
+            (fraud.response.queue)"]
+            PPS_OUT["JMS Producer
+            (payment.notification.queue)"]
         end
     end
 
@@ -167,8 +189,10 @@ graph TB
         direction TB
 
         subgraph "Integration"
-            JMS_IN["JMS Listener\n(fraud.request.queue)"]
-            JMS_OUT["JMS Producer\n(fraud.response.queue)"]
+            JMS_IN["JMS Listener
+            (fraud.request.queue)"]
+            JMS_OUT["JMS Producer
+            (fraud.response.queue)"]
         end
 
         subgraph "Processing"
@@ -177,7 +201,8 @@ graph TB
         end
 
         subgraph "Configuration"
-            BL_CFG["blacklist.yml\n(Externalized Config)"]
+            BL_CFG["blacklist.yml
+            (Externalized Config)"]
         end
     end
 
@@ -201,8 +226,10 @@ graph TB
         direction TB
 
         subgraph "API Layer"
-            CDC_IN["CDC Ingest Endpoint\n(POST /api/v1/cdc/payments)"]
-            AQ["Audit Query Controller\n(GET /api/v1/audit-logs)"]
+            CDC_IN["CDC Ingest Endpoint
+            (POST /api/v1/cdc/payments)"]
+            AQ["Audit Query Controller
+            (GET /api/v1/audit-logs)"]
         end
 
         subgraph "Service Layer"
@@ -608,10 +635,14 @@ ALTER TABLE payments REPLICA IDENTITY FULL;
 ```mermaid
 graph LR
     subgraph "ActiveMQ Artemis"
-        Q1["payment.request.queue\n(JSON)"]
-        Q2["fraud.request.queue\n(XML)"]
-        Q3["fraud.response.queue\n(XML)"]
-        Q4["payment.notification.queue\n(JSON)"]
+        Q1["payment.request.queue
+        (JSON)"]
+        Q2["fraud.request.queue
+        (XML)"]
+        Q3["fraud.response.queue
+        (XML)"]
+        Q4["payment.notification.queue
+        (JSON)"]
     end
 
     PPS["PPS"] -->|"produce (Sol1)"| Q1
@@ -635,9 +666,14 @@ graph LR
 
 ```mermaid
 graph LR
-    PG["PostgreSQL\n(WAL)"] -->|"Logical Replication"| DBZ["Debezium Server\n:8085"]
-    DBZ -->|"HTTP POST\n(JSON change events)"| AS["Audit Service\n:8084"]
-    AS -->|"JPA"| PG_AUDIT["PostgreSQL\n(audit_logs table)"]
+    PG["PostgreSQL
+    (WAL)"] -->|"Logical Replication"| DBZ["Debezium Server
+    :8085"]
+    DBZ -->|"HTTP POST
+    (JSON change events)"| AS["Audit Service
+    :8084"]
+    AS -->|"JPA"| PG_AUDIT["PostgreSQL
+    (audit_logs table)"]
 ```
 
 | Source | Mechanism | Format | Destination |
@@ -664,13 +700,17 @@ graph TB
     end
 
     subgraph "Profile: sol1"
-        PPS_JMS["PPS JMS Routes\n(payment.request.queue)"]
-        BS_JMS_IN["BS JMS Inbound\n(from PPS)"]
+        PPS_JMS["PPS JMS Routes
+        (payment.request.queue)"]
+        BS_JMS_IN["BS JMS Inbound
+        (from PPS)"]
     end
 
     subgraph "Profile: sol2"
-        PPS_REST_OUT["PPS REST Client\n(calls BS)"]
-        BS_REST_IN["BS REST Controller\n(/api/v1/fraud-check)"]
+        PPS_REST_OUT["PPS REST Client
+        (calls BS)"]
+        BS_REST_IN["BS REST Controller
+        (/api/v1/fraud-check)"]
     end
 ```
 
@@ -732,13 +772,17 @@ blacklist:
 ```mermaid
 graph TB
     subgraph "Docker Compose"
-        PG["PostgreSQL :5432\n(wal_level=logical)"]
+        PG["PostgreSQL :5432
+        (wal_level=logical)"]
         AMQ["Artemis :61616 / :8161"]
         DBZ["Debezium Server :8085"]
-        PPS["PPS :8081\n(Swagger UI)"]
-        BS["BS :8082\n(Swagger UI)"]
+        PPS["PPS :8081
+        (Swagger UI)"]
+        BS["BS :8082
+        (Swagger UI)"]
         FCS["FCS :8083"]
-        AS["Audit Service :8084\n(Swagger UI)"]
+        AS["Audit Service :8084
+        (Swagger UI)"]
     end
 
     PPS --> PG
