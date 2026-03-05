@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Payment Notifications Demo</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 40px;
+            background-color: #f9f9f9;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        .status-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        #status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: gray;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 20px;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        th,
+        td {
+            border: 1px solid #eee;
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            font-weight: 600;
+            color: #555;
+        }
+
+        tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        .status-APPROVED {
+            color: #155724;
+            background-color: #d4edda;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            border: 1px solid #c3e6cb;
+            display: inline-block;
+        }
+
+        .status-REJECTED {
+            color: #721c24;
+            background-color: #f8d7da;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            border: 1px solid #f5c6cb;
+            display: inline-block;
+        }
+
+        .status-PENDING {
+            color: #856404;
+            background-color: #fff3cd;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            border: 1px solid #ffeeba;
+            display: inline-block;
+        }
+
+        .tx-id {
+            font-family: monospace;
+            color: #666;
+        }
+    </style>
+    <!-- SockJS and Stomp -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+
+<body>
+
+    <div class="status-header">
+        <h2>Live Payment Notifications</h2>
+        <div id="status-indicator"></div>
+        <span id="status-text" style="color: gray;">Disconnected</span>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <label for="ws-url" style="font-weight: bold; margin-right: 10px;">WebSocket URL:</label>
+        <input type="text" id="ws-url" value="http://localhost:8081/ws/payments"
+            style="width: 300px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;" />
+        <button onclick="connectUrl()"
+            style="padding: 6px 12px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Connect</button>
+        <button onclick="disconnect()"
+            style="padding: 6px 12px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 5px;">Disconnect</button>
+    </div>
+
+    <p>Submit a payment via Swagger UI (e.g. <code>http://localhost:8081/swagger-ui.html</code>) and watch the updates
+        below in real-time.</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Transaction ID</th>
+                <th>Previous Status</th>
+                <th>New Status</th>
+            </tr>
+        </thead>
+        <tbody id="paymentsTableBody">
+            <tr id="empty-row">
+                <td colspan="4" style="text-align: center; color: #999;">Listening for events...</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+        var stompClient = null;
+
+        function connectUrl() {
+            var url = document.getElementById('ws-url').value;
+            disconnect(); // disconnect existing if any
+
+            document.getElementById('status-text').innerText = 'Connecting...';
+            document.getElementById('status-indicator').style.backgroundColor = 'gray';
+
+            var socket = new SockJS(url);
+            stompClient = Stomp.over(socket);
+            stompClient.debug = null; // Disable debug logging in console
+
+            stompClient.connect({}, function (frame) {
+                document.getElementById('status-text').innerText = 'Connected to ' + url;
+                document.getElementById('status-indicator').style.backgroundColor = 'green';
+
+                stompClient.subscribe('/topic/payments', function (notification) {
+                    showNotification(JSON.parse(notification.body));
+                });
+            }, function (error) {
+                document.getElementById('status-text').innerText = 'Disconnected or Error';
+                document.getElementById('status-indicator').style.backgroundColor = 'red';
+            });
+        }
+
+        function disconnect() {
+            if (stompClient !== null && stompClient.connected) {
+                stompClient.disconnect();
+            }
+            document.getElementById('status-text').innerText = 'Disconnected';
+            document.getElementById('status-indicator').style.backgroundColor = 'gray';
+        }
+
+        function showNotification(message) {
+            var emptyRow = document.getElementById('empty-row');
+            if (emptyRow) {
+                emptyRow.remove();
+            }
+
+            var tbody = document.getElementById('paymentsTableBody');
+            var tr = document.createElement('tr');
+
+            var timeTd = document.createElement('td');
+            timeTd.innerText = new Date(message.updatedAt).toLocaleTimeString();
+
+            var txTd = document.createElement('td');
+            txTd.className = 'tx-id';
+            txTd.innerText = message.transactionId;
+
+            var prevStatusTd = document.createElement('td');
+            prevStatusTd.innerText = message.previousStatus || '-';
+
+            var newStatusTd = document.createElement('td');
+            var span = document.createElement('span');
+            span.innerText = message.status;
+            span.className = 'status-' + message.status;
+            newStatusTd.appendChild(span);
+
+            tr.appendChild(timeTd);
+            tr.appendChild(txTd);
+            tr.appendChild(prevStatusTd);
+            tr.appendChild(newStatusTd);
+
+            tbody.prepend(tr); // Add to top
+        }
+
+        // Connect automatically on load
+        connectUrl();
+    </script>
+</body>
+
+</html>
