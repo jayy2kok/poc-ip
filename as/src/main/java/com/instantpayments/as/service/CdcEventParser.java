@@ -2,8 +2,10 @@ package com.instantpayments.as.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.instantpayments.as.entity.AuditLog;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -55,9 +57,11 @@ public class CdcEventParser {
 
       // Set before/after state as JSONB strings
       if (!before.isMissingNode() && !before.isNull()) {
+        formatDateNode(before);
         auditLog.setBeforeState(objectMapper.writeValueAsString(before));
       }
       if (!after.isMissingNode() && !after.isNull()) {
+        formatDateNode(after);
         auditLog.setAfterState(objectMapper.writeValueAsString(after));
       }
 
@@ -86,6 +90,17 @@ public class CdcEventParser {
     } catch (Exception e) {
       log.error("Failed to parse CDC event", e);
       throw new RuntimeException("Failed to parse CDC event", e);
+    }
+  }
+
+  private void formatDateNode(JsonNode node) {
+    if (node instanceof ObjectNode) {
+      ObjectNode obj = (ObjectNode) node;
+      JsonNode dateNode = obj.get("execution_date");
+      if (dateNode != null && dateNode.isNumber()) {
+        LocalDate date = LocalDate.ofEpochDay(dateNode.asLong());
+        obj.put("execution_date", date.toString());
+      }
     }
   }
 }

@@ -50,13 +50,14 @@ services:
     ports:
       - "8081:8081"
     environment:
-      SPRING_PROFILES_ACTIVE: sol1
+      SPRING_PROFILES_ACTIVE: sol2
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/instantpayments
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_ARTEMIS_BROKER_URL: tcp://artemis:61616
       SPRING_ARTEMIS_USER: admin
       SPRING_ARTEMIS_PASSWORD: admin
+      PPS_BROKER_SYSTEM_URL: http://bs:8082
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,7 +72,7 @@ services:
     ports:
       - "8082:8082"
     environment:
-      SPRING_PROFILES_ACTIVE: sol1
+      SPRING_PROFILES_ACTIVE: sol2
       SPRING_ARTEMIS_BROKER_URL: tcp://artemis:61616
       SPRING_ARTEMIS_USER: admin
       SPRING_ARTEMIS_PASSWORD: admin

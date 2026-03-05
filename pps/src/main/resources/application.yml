@@ -41,7 +41,3 @@ pps:
 logging:
     level:
         com.instantpayments.pps: DEBUG
-
-springdoc:
-    swagger-ui:
-        url: /openapi/pps-api.yaml

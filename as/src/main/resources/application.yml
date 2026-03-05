@@ -27,7 +27,3 @@ server:
 logging:
     level:
         com.instantpayments.as: DEBUG
-
-springdoc:
-    swagger-ui:
-        url: /openapi/as-api.yaml
