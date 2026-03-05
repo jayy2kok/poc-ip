@@ -784,6 +784,7 @@ graph TB
 | XML | JAXB | — |
 | Testing | JUnit 5, Mockito, Testcontainers | — |
 | Coverage | JaCoCo (95% target) | — |
+| Code Quality | Checkstyle (Google Java Style), Spotless | — |
 | Containers | Docker, Docker Compose | — |
 | Logging | SLF4J + Logback (async) | — |
 

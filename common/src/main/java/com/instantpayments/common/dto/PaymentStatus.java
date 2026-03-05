@@ -1,10 +1,8 @@
 package com.instantpayments.common.dto;
 
-/**
- * Payment processing status.
- */
+/** Payment processing status. */
 public enum PaymentStatus {
-    PENDING,
-    APPROVED,
-    REJECTED
+  PENDING,
+  APPROVED,
+  REJECTED
 }
