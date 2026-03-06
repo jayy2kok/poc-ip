@@ -131,11 +131,14 @@ graph TB
 
 **Responsibilities:**
 1. Receive fraud check requests from PPS (JMS/JSON for Sol1, REST/JSON for Sol2)
-2. Convert JSON payment payload → XML fraud check request
-3. Forward XML request to FCS via JMS queue
-4. Receive XML fraud check response from FCS
-5. Convert XML response → JSON notification
-6. Send JSON notification back to PPS via JMS queue
+2. Convert JSON payment payload → XML fraud check request (via Camel JAXB data format)
+3. Forward XML request to FCS via JMS queue (via Camel JMS component)
+4. Receive XML fraud check response from FCS (via Camel JMS component)
+5. Convert XML response → JSON notification (via Camel Jackson data format)
+6. Send JSON notification back to PPS via JMS queue (via Camel JMS component)
+
+**Apache Camel Integration:**
+The BS module is fully powered by Apache Camel routes. All JMS consumption, data format conversion (JSON ↔ XML), and JMS production are defined declaratively in a `BrokerRouteBuilder`. No manual `@JmsListener` or `JmsTemplate` usage exists — Camel manages the entire integration pipeline.
 
 ```mermaid
 graph TB
@@ -143,35 +146,34 @@ graph TB
         direction TB
 
         subgraph "Inbound"
-            JMS_IN["JMS Listener
+            JMS_IN["Camel JMS Route
             (Sol1 - payment.request.queue)"]
-            REST_IN["REST Controller
+            REST_IN["REST Controller + Camel ProducerTemplate
             (Sol2 - /api/v1/fraud-check)"]
         end
 
-        subgraph "Processing"
-            J2X["JSON → XML
-            Converter"]
-            X2J["XML → JSON
-            Converter"]
-            ROUTE["Camel Routes
-            (Orchestration)"]
+        subgraph "Camel Processing Pipeline"
+            J2X["Camel Jackson unmarshal
+            → PaymentMapper bean
+            → Camel JAXB marshal"]
+            X2J["Camel JAXB unmarshal
+            → PaymentMapper bean
+            → Camel Jackson marshal"]
         end
 
         subgraph "Outbound"
-            FCS_OUT["JMS Producer
+            FCS_OUT["Camel JMS Producer
             (fraud.request.queue)"]
-            FCS_IN["JMS Listener
+            FCS_IN["Camel JMS Route
             (fraud.response.queue)"]
-            PPS_OUT["JMS Producer
+            PPS_OUT["Camel JMS Producer
             (payment.notification.queue)"]
         end
     end
 
     JMS_IN --> J2X
     REST_IN --> J2X
-    J2X --> ROUTE
-    ROUTE --> FCS_OUT
+    J2X --> FCS_OUT
     FCS_IN --> X2J
     X2J --> PPS_OUT
 ```
@@ -694,7 +696,8 @@ graph TB
         SVC["PaymentService"]
         WS["WebSocket"]
         FCS_ALL["FCS (entire system)"]
-        BS_CORE["BS JSON↔XML Converter"]
+        BS_CORE["BS Camel Routes
+        (JAXB/Jackson Data Formats)"]
         BS_FCS["BS ↔ FCS JMS Routes"]
         AS_ALL["AS (entire system)"]
     end
